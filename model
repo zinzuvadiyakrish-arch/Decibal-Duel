@@ -1,0 +1,125 @@
+import os
+!cp -r "/content/drive/MyDrive/Untitled folder/train" "/content/train_data"
+!cp -r "/content/drive/MyDrive/Untitled folder/Test" "/content/test_data"
+print("Train folders:", os.listdir("/content/train_data"))
+print("Test folders:", os.listdir("/content/test_data"))
+
+
+import os
+train_path = "/content/train_data"
+test_path = "/content/test_data"
+
+print("Train files:", len(os.listdir(train_path)))
+print("Test files:", len(os.listdir(test_path)))
+
+
+
+
+
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+
+
+
+# -----------------------------
+# Accuracy Function
+# -----------------------------
+def accuracy(loader):
+    model.eval()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for Xb, yb in loader:
+            Xb, yb = Xb.to(device), yb.to(device)
+            preds = model(Xb)
+            _, predicted = torch.max(preds, 1)
+            total += yb.size(0)
+            correct += (predicted == yb).sum().item()
+    return 100 * correct / total
+
+# -----------------------------
+# Training Loop
+# -----------------------------
+best_val_acc = 0
+best_model_path = "best_model.pth"
+print("\n🚀 Training started...\n")
+
+for epoch in range(50):
+    model.train()
+    running_loss = 0
+    for Xb, yb in train_loader:
+        Xb, yb = Xb.to(device), yb.to(device)
+        optimizer.zero_grad()
+        preds = model(Xb)
+        loss = criterion(preds, yb)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item()
+
+    train_acc = accuracy(train_loader)
+    val_acc = accuracy(val_loader)
+
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        torch.save(model.state_dict(), best_model_path)
+
+    print(f"Epoch [{epoch+1}/50] | Loss: {running_loss/len(train_loader):.4f} "
+          f"| Train Acc: {train_acc:.2f}% | Val Acc: {val_acc:.2f}% | Best: {best_val_acc:.2f}%")
+
+# -----------------------------
+# Load Best Model
+# -----------------------------
+model.load_state_dict(torch.load(best_model_path))
+print(f"\nLoaded best model with Val Acc: {best_val_acc:.2f}%")
+
+# -----------------------------
+# Prepare Test Data
+# -----------------------------
+if not os.path.exists(sample_submission_path):
+    test_files = sorted(os.listdir(test_path))
+    pd.DataFrame({"ID": test_files, "Class": [""] * len(test_files)}).to_csv(
+        sample_submission_path, index=False
+    )
+    print("Created new sample_submission.csv.")
+
+sample_submission = pd.read_csv(sample_submission_path)
+test_ids = sample_submission["ID"].tolist()
+
+print("\nExtracting test features...")
+test_features = []
+for file_id in tqdm(test_ids):
+    file_path = os.path.join(test_path, file_id)
+    feat = extract_features(file_path) if os.path.exists(file_path) else np.zeros(X.shape[1])
+    test_features.append(feat)
+
+test_X = scaler.transform(np.array(test_features))
+test_ds = AudioDataset(test_X)
+test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
+
+# -----------------------------
+# Predictions
+# -----------------------------
+model.eval()
+predictions = []
+with torch.no_grad():
+    for batch_X in test_loader:
+        batch_X = batch_X.to(device)
+        outputs = model(batch_X)
+        preds = torch.argmax(outputs, dim=1)
+        predictions.extend(preds.cpu().numpy())
+
+# -----------------------------
+# Save Submission
+# -----------------------------
+submission = pd.DataFrame({
+    "ID": test_ids,
+    "Class": label_encoder.inverse_transform(predictions)
+})
+submission.to_csv("submission.csv", index=False)
+
+print("\nsubmission.csv created")
+print(submission.head())
+print(f"Total rows in submission: {len(submission)}")
+print(f"Best Validation Accuracy: {best_val_acc:.2f}%")
