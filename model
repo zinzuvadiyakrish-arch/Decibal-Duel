@@ -24,9 +24,8 @@ drive.mount('/content/drive')
 
 
 
-# -----------------------------
 # Accuracy Function
-# -----------------------------
+
 def accuracy(loader):
     model.eval()
     correct, total = 0, 0
@@ -39,12 +38,11 @@ def accuracy(loader):
             correct += (predicted == yb).sum().item()
     return 100 * correct / total
 
-# -----------------------------
 # Training Loop
-# -----------------------------
+
 best_val_acc = 0
 best_model_path = "best_model.pth"
-print("\n🚀 Training started...\n")
+print("\nTraining started...\n")
 
 for epoch in range(50):
     model.train()
@@ -68,15 +66,15 @@ for epoch in range(50):
     print(f"Epoch [{epoch+1}/50] | Loss: {running_loss/len(train_loader):.4f} "
           f"| Train Acc: {train_acc:.2f}% | Val Acc: {val_acc:.2f}% | Best: {best_val_acc:.2f}%")
 
-# -----------------------------
+
 # Load Best Model
-# -----------------------------
+
 model.load_state_dict(torch.load(best_model_path))
 print(f"\nLoaded best model with Val Acc: {best_val_acc:.2f}%")
 
-# -----------------------------
+
 # Prepare Test Data
-# -----------------------------
+
 if not os.path.exists(sample_submission_path):
     test_files = sorted(os.listdir(test_path))
     pd.DataFrame({"ID": test_files, "Class": [""] * len(test_files)}).to_csv(
@@ -98,9 +96,8 @@ test_X = scaler.transform(np.array(test_features))
 test_ds = AudioDataset(test_X)
 test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
 
-# -----------------------------
 # Predictions
-# -----------------------------
+
 model.eval()
 predictions = []
 with torch.no_grad():
@@ -110,9 +107,8 @@ with torch.no_grad():
         preds = torch.argmax(outputs, dim=1)
         predictions.extend(preds.cpu().numpy())
 
-# -----------------------------
 # Save Submission
-# -----------------------------
+
 submission = pd.DataFrame({
     "ID": test_ids,
     "Class": label_encoder.inverse_transform(predictions)
