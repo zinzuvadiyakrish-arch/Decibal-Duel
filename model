@@ -1,26 +1,17 @@
-import os
-!cp -r "/content/drive/MyDrive/Untitled folder/train" "/content/train_data"
-!cp -r "/content/drive/MyDrive/Untitled folder/Test" "/content/test_data"
-print("Train folders:", os.listdir("/content/train_data"))
-print("Test folders:", os.listdir("/content/test_data"))
-
-
-import os
-train_path = "/content/train_data"
-test_path = "/content/test_data"
-
-print("Train files:", len(os.listdir(train_path)))
-print("Test files:", len(os.listdir(test_path)))
-
-
-
-
 
 
 from google.colab import drive
 drive.mount('/content/drive')
 
 import os
+
+!cp -r "/content/drive/MyDrive/Untitled folder/train" "/content/train_data"
+!cp -r "/content/drive/MyDrive/Untitled folder/Test" "/content/test_data"
+
+print("Train folders:", os.listdir("/content/train_data"))
+print("Test files:", len(os.listdir("/content/test_data")))
+
+
 import numpy as np
 import pandas as pd
 import librosa
@@ -33,52 +24,59 @@ from torch.utils.data import Dataset, DataLoader, random_split
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-# Paths
-TRAIN_PATH = "train_data"
-TEST_PATH = "test_data"
+
+
+TRAIN_PATH = "/content/train_data"
+TEST_PATH = "/content/test_data"
 SAMPLE_SUBMISSION_PATH = "sample_submission.csv"
 
-# Feature extraction
+
+
+
 def extract_features(file_path, max_len=22050 * 3):
- try:
-  y, sr = librosa.load(file_path, sr=None)
+    try:
+        y, sr = librosa.load(file_path, sr=22050)
 
-  if len(y) > max_len:
-      y = y[:max_len]
-  else:
-      y = np.pad(y, (0, max_len - len(y)))
+        if len(y) > max_len:
+            y = y[:max_len]
+        else:
+            y = np.pad(y, (0, max_len - len(y)))
 
-  mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-  return np.mean(mfcc.T, axis=0)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+        return np.mean(mfcc.T, axis=0)
 
- except Exception as e:
-  print(f"Error processing {file_path}: {e}")
-  return np.zeros(40)
+    except Exception as e:
+        print(f"Error processing {file_path}: {e}")
+        return np.zeros(40)
 
-# Load training data
+
+
 files, labels = [], []
 
 for label_name in os.listdir(TRAIN_PATH):
- class_dir = os.path.join(TRAIN_PATH, label_name)
- if os.path.isdir(class_dir):
-  for f in os.listdir(class_dir):
-   if f.endswith(".wav"):
-    files.append(os.path.join(class_dir, f))
-    labels.append(label_name)
+    class_dir = os.path.join(TRAIN_PATH, label_name)
+    if os.path.isdir(class_dir):
+        for f in os.listdir(class_dir):
+            if f.endswith(".wav"):
+                files.append(os.path.join(class_dir, f))
+                labels.append(label_name)
 
 print(f"Found {len(files)} training files across {len(set(labels))} classes")
 
-# Extract features
+
+
+
 X, y = [], []
 
 for f, label in tqdm(zip(files, labels), total=len(files), desc="Extracting features"):
- X.append(extract_features(f))
- y.append(label)
+    X.append(extract_features(f))
+    y.append(label)
 
 X = np.array(X)
 y = np.array(y)
 
-# preprocessing
+
+
 scaler = StandardScaler()
 X = scaler.fit_transform(X)
 
@@ -88,21 +86,24 @@ class_names = label_encoder.classes_
 
 print("Classes:", class_names)
 
-# Dataset
+
+
 class AudioDataset(Dataset):
- def __init__(self, X, y=None):
-  self.X = torch.tensor(X, dtype=torch.float32)
-  self.y = torch.tensor(y, dtype=torch.long) if y is not None else None
+    def __init__(self, X, y=None):
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.long) if y is not None else None
 
- def __len__(self):
-  return len(self.X)
+    def __len__(self):
+        return len(self.X)
 
- def __getitem__(self, idx):
-  if self.y is not None:
-   return self.X[idx], self.y[idx]
-  return self.X[idx]
+    def __getitem__(self, idx):
+        if self.y is not None:
+            return self.X[idx], self.y[idx]
+        return self.X[idx]
 
-# Train split
+
+
+
 full_dataset = AudioDataset(X, y)
 train_size = int(0.8 * len(full_dataset))
 val_size = len(full_dataset) - train_size
@@ -112,28 +113,32 @@ train_ds, val_ds = random_split(full_dataset, [train_size, val_size])
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_ds, batch_size=32, shuffle=False)
 
-# Model
+
+
+
 class AudioNet(nn.Module):
- def __init__(self, input_dim, num_classes):
-  super().__init__()
-  self.net = nn.Sequential(
-   nn.Linear(input_dim, 256),
-   nn.BatchNorm1d(256),
-   nn.ReLU(),
-   nn.Dropout(0.4),
+    def __init__(self, input_dim, num_classes):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.4),
 
-   nn.Linear(256, 128),
-   nn.BatchNorm1d(128),
-   nn.ReLU(),
-   nn.Dropout(0.3),
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
 
-   nn.Linear(128, num_classes)
-  )
+            nn.Linear(128, num_classes)
+        )
 
- def forward(self, x):
-  return self.net(x)
+    def forward(self, x):
+        return self.net(x)
 
-# Training setup
+
+
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = AudioNet(X.shape[1], len(class_names)).to(device)
 
@@ -141,8 +146,6 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
 
-
-# Accuracy Function
 
 def accuracy(loader):
     model.eval()
@@ -156,22 +159,25 @@ def accuracy(loader):
             correct += (predicted == yb).sum().item()
     return 100 * correct / total
 
-# Training Loop
+
+
 
 best_val_acc = 0
 best_model_path = "best_model.pth"
-print("\nTraining started...\n")
 
 for epoch in range(50):
     model.train()
     running_loss = 0
+
     for Xb, yb in train_loader:
         Xb, yb = Xb.to(device), yb.to(device)
+
         optimizer.zero_grad()
         preds = model(Xb)
         loss = criterion(preds, yb)
         loss.backward()
         optimizer.step()
+
         running_loss += loss.item()
 
     train_acc = accuracy(train_loader)
@@ -181,43 +187,48 @@ for epoch in range(50):
         best_val_acc = val_acc
         torch.save(model.state_dict(), best_model_path)
 
-    print(f"Epoch [{epoch+1}/50] | Loss: {running_loss/len(train_loader):.4f} "
-          f"| Train Acc: {train_acc:.2f}% | Val Acc: {val_acc:.2f}% | Best: {best_val_acc:.2f}%")
+    print(
+        f"Epoch [{epoch+1}/50] "
+        f"Loss: {running_loss/len(train_loader):.4f} "
+        f"Train Acc: {train_acc:.2f}% "
+        f"Val Acc: {val_acc:.2f}% "
+        f"Best: {best_val_acc:.2f}%"
+    )
 
 
-# Load Best Model
 
 model.load_state_dict(torch.load(best_model_path))
-print(f"\nLoaded best model with Val Acc: {best_val_acc:.2f}%")
+print(f"Loaded best model with Val Acc: {best_val_acc:.2f}%")
 
 
-# Prepare Test Data
+if not os.path.exists(SAMPLE_SUBMISSION_PATH):
+    test_files = sorted(os.listdir(TEST_PATH))
+    pd.DataFrame({
+        "ID": test_files,
+        "Class": [""] * len(test_files)
+    }).to_csv(SAMPLE_SUBMISSION_PATH, index=False)
 
-if not os.path.exists(sample_submission_path):
-    test_files = sorted(os.listdir(test_path))
-    pd.DataFrame({"ID": test_files, "Class": [""] * len(test_files)}).to_csv(
-        sample_submission_path, index=False
-    )
-    print("Created new sample_submission.csv.")
-
-sample_submission = pd.read_csv(sample_submission_path)
+sample_submission = pd.read_csv(SAMPLE_SUBMISSION_PATH)
 test_ids = sample_submission["ID"].tolist()
 
-print("\nExtracting test features...")
 test_features = []
-for file_id in tqdm(test_ids):
-    file_path = os.path.join(test_path, file_id)
-    feat = extract_features(file_path) if os.path.exists(file_path) else np.zeros(X.shape[1])
-    test_features.append(feat)
+for file_id in tqdm(test_ids, desc="Extracting test features"):
+    file_path = os.path.join(TEST_PATH, file_id)
+    if os.path.exists(file_path):
+        test_features.append(extract_features(file_path))
+    else:
+        test_features.append(np.zeros(X.shape[1]))
 
 test_X = scaler.transform(np.array(test_features))
+
 test_ds = AudioDataset(test_X)
 test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
 
-# Predictions
+
 
 model.eval()
 predictions = []
+
 with torch.no_grad():
     for batch_X in test_loader:
         batch_X = batch_X.to(device)
@@ -225,15 +236,17 @@ with torch.no_grad():
         preds = torch.argmax(outputs, dim=1)
         predictions.extend(preds.cpu().numpy())
 
-# Save Submission
+
+
 
 submission = pd.DataFrame({
     "ID": test_ids,
     "Class": label_encoder.inverse_transform(predictions)
 })
+
 submission.to_csv("submission.csv", index=False)
 
-print("\nsubmission.csv created")
+print("submission.csv created")
 print(submission.head())
-print(f"Total rows in submission: {len(submission)}")
-print(f"Best Validation Accuracy: {best_val_acc:.2f}%")
+print(f"Total rows: {len(submission)}")
+print(f"Best validation accuracy: {best_val_acc:.2f}%")
